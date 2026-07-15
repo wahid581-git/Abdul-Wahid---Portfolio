@@ -1,50 +1,30 @@
-name: Deploy to GitHub Pages
+The job is failing because npm ci cannot find the package.json file. The error shows:
 
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
+Code
+npm error enoent Could not read package.json: Error: ENOENT: no such file or directory, open '/home/runner/work/portfolio/portfolio/package.json'
+Root Cause
+Your repository has a directory structure mismatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+The workflow file is at .github/workflows/deploy.yml (root level)
+The package.json is nested inside a portfolio/ subdirectory
+When the workflow runs, it checks out the repository and runs npm ci from the root, but package.json is in portfolio/package.json
+Solution
+Add a working-directory to the npm commands in your workflow. Update your deploy.yml:
 
-concurrency:
-  group: pages
-  cancel-in-progress: true
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
+YAML
       - name: Install dependencies
         run: npm ci
+        working-directory: ./portfolio
 
       - name: Build
         run: npm run build
+        working-directory: ./portfolio
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./dist
+          path: ./portfolio/dist
+Also update the artifact path in the Upload artifact step to point to ./portfolio/dist instead of ./dist.
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+This tells npm and the build process to run from the portfolio subdirectory where the package.json file is located.
+
